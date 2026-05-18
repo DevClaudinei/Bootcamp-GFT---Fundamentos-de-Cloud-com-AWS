@@ -10,7 +10,7 @@ O projeto evoluiu da infraestrutura computacional clássica para um modelo híbr
 
 O diagrama abaixo, modelado no **draw.io**, ilustra o fluxo contínuo de processamento de dados e o escopo de isolamento de rede de cada recurso:
 
-![Arquitetura da Solução](./images/arquitetura-desafio1.png)
+![Arquitetura da Solução](./Desafio%2001/images/arquitetura-desafio1.png)
 
 ### 📈 Animação de Fluxo (Dynamics):
 A arquitetura utiliza o recurso de *Flow Animation* ativo para monitorar visualmente o trajeto do dado desde o provisionamento no servidor até a sua persistência e transformação assíncrona.
