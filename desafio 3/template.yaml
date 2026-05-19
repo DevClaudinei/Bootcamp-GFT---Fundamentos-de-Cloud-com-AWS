@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Desafio 3 DIO - Stack Avançada de Rede e Segurança para Ecossistema .NET Core e SQL Server'
+
+Resources:
+  # 1. Criação da VPC (Rede Isolada da Aplicação)
+  VpcCorporativa:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: 'VPC-Producao-8Quali'
+
+  # 2. Subnet Pública (Onde ficarão as instâncias EC2 rodando as APIs C#)
+  SubnetPublicaAPI:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VpcCorporativa
+      CidrBlock: '10.0.1.0/24'
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: 'Subnet-Publica-WebAPI'
+
+  # 3. Subnet Privada (Onde ficará o Amazon RDS com o Microsoft SQL Server)
+  SubnetPrivadaDB:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VpcCorporativa
+      CidrBlock: '10.0.2.0/24'
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: 'Subnet-Privada-SQLServer'
+
+  # 4. Internet Gateway (Para permitir que o mundo acesse a nossa Subnet Pública)
+  InternetGateway:
+      Type: 'AWS::EC2::InternetGateway'
+      Properties:
+        Tags:
+          - Key: Name
+            Value: 'IGW-VpcCorporativa'
+
+  VpcGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VpcCorporativa
+      InternetGatewayId: !Ref InternetGateway
+
+  # 5. Tabela de Roteamento para a Subnet Pública
+  RouteTablePublica:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VpcCorporativa
+      Tags:
+        - Key: Name
+          Value: 'RT-Publica'
+
+  RotaParaInternet:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref RouteTablePublica
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  SubnetPublicaAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetPublicaAPI
+      RouteTableId: !Ref RouteTablePublica
+
+  # 6. Firewall Perimetral da API (Security Group)
+  SecurityGroupAPI:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Libera portas HTTP/HTTPS para acesso publico a API C#'
+      VpcId: !Ref VpcCorporativa
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: Name
+          Value: 'SG-WebAPI-NET'
+
+  # 7. Firewall do Banco de Dados (Bloqueio estrito de rede)
+  SecurityGroupSQLServer:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Permite conexao na porta 1433 APENAS se a origem vier do Security Group da API'
+      VpcId: !Ref VpcCorporativa
+      SecurityGroupIngress:
+        # Aqui amarramos a origem ao ID do Security Group da API, impedindo acesso externo direto
+        - IpProtocol: tcp
+          FromPort: 1433
+          ToPort: 1433
+          SourceSecurityGroupId: !Ref SecurityGroupAPI
+      Tags:
+        - Key: Name
+          Value: 'SG-Database-SQLServer'
+
+Outputs:
+  VpcIdOutput:
+    Description: 'ID da VPC Corporativa criada'
+    Value: !Ref VpcCorporativa
+  SubnetPublicaOutput:
+    Description: 'ID da Subnet Publica (Web API)'
+    Value: !Ref SubnetPublicaAPI
+  SubnetPrivadaOutput:
+    Description: 'ID da Subnet Privada (SQL Server)'
+    Value: !Ref SubnetPrivadaDB
