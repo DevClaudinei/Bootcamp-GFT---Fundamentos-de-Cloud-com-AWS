@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Deploy Automatizado de Minimal API .NET Core extraida do GitHub para Instancia EC2 em Ohio'
+
+Resources:
+  # 1. Rede Isolada para a nossa API
+  VpcMinimalAPI:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: 'VPC-MinimalAPI-Randstad'
+
+  # 2. Subnet Publica com atribuicao de IP automatico
+  SubnetPublicaAPI:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VpcMinimalAPI
+      CidrBlock: '10.0.1.0/24'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: 'Subnet-Publica-MinimalAPI'
+
+  # 3. Internet Gateway para comunicacao externa
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 'IGW-MinimalAPI'
+
+  VpcGatewayAttachment:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VpcMinimalAPI
+      InternetGatewayId: !Ref InternetGateway
+
+  # 4. Roteamento de Internet
+  RouteTablePublica:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VpcMinimalAPI
+      Tags:
+        - Key: Name
+          Value: 'RT-MinimalAPI'
+
+  RotaParaInternet:
+    Type: 'AWS::EC2::Route'
+    Properties:
+      RouteTableId: !Ref RouteTablePublica
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  SubnetAssociation:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref SubnetPublicaAPI
+      RouteTableId: !Ref RouteTablePublica
+
+  # 5. Firewall Libera Porta 5092 (Swagger) e SSH para Manutencao
+  SecurityGroupMinimalAPI:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Libera acesso ao Swagger da Minimal API (5092) e SSH'
+      VpcId: !Ref VpcMinimalAPI
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5092
+          ToPort: 5092
+          CidrIp: '0.0.0.0/0'
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '0.0.0.0/0'
+      Tags:
+        - Key: Name
+          Value: 'SG-MinimalAPI-Randstad'
+
+  # 6. A Maquina Servidora com Bootstrapping do .NET, Git e Variaveis de Ambiente
+  InstanciaServidorAPI:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't3.micro' # Mantido no Free Tier de Ohio
+      ImageId: 'ami-0eab37cfdc33e8e65' # ID Verificado por voce para o Ubuntu 24.04 LTS em us-east-2
+      SubnetId: !Ref SubnetPublicaAPI
+      SecurityGroupIds:
+        - !Ref SecurityGroupMinimalAPI
+      Tags:
+        - Key: Name
+          Value: 'Servidor-MinimalAPI-Randstad'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Atualiza os pacotes do sistema Linux
+          apt-get update -y
+
+          # Instala os pre-requisitos e o SDK oficial do .NET 8 de forma nativa no Ubuntu 24.04
+          apt-get install -y wget apt-transport-https git
+          
+          wget https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+          dpkg -i packages-microsoft-prod.deb
+          rm packages-microsoft-prod.deb
+          
+          apt-get update -y
+          apt-get install -y dotnet-sdk-8.0
+
+          # Forca variaveis globais para escuta externa e ativacao do Swagger em modo Release
+          export DOTNET_URLS="http://0.0.0.0:5092"
+          export ASPNETCORE_ENVIRONMENT="Development"
+          echo 'export DOTNET_URLS="http://0.0.0.0:5092"' >> /etc/profile
+          echo 'export ASPNETCORE_ENVIRONMENT="Development"' >> /etc/profile
+
+          # Realiza o clone do seu repositorio Git dentro do diretorio opt
+          cd /opt
+          git clone https://github.com/DevClaudinei/minimal_api_bootcamp_randstad.git
+          cd minimal_api_bootcamp_randstad
+
+          # Builda e executa a Minimal API em background de forma asincrona
+          nohup dotnet run --project MinimalApi --configuration Release --urls "http://0.0.0.0:5092" > /var/log/minimal_api.log 2>&1 &
+
+Outputs:
+  UrlSwaggerAPI:
+    Description: 'URL publica para acessar o Swagger da sua API na AWS'
+    Value: !Sub 'http://${InstanciaServidorAPI.PublicIp}:5092/swagger/index.html'
