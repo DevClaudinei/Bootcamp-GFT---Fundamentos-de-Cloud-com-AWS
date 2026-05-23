@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  localstack:
+    container_name: localstack-portfolio
+    image: localstack/localstack:3.4.0   # ALTERADO: Força o uso da versão comunitária gratuita estável
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,dynamodb
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - "./infra/init-scripts:/etc/localstack/init/ready.d"
