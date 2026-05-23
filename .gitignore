@@ -1,0 +1,46 @@
+## User secrets e arquivos de configuração local da AWS
+.aws/
+.sagemaker/
+aws-lambda-tools-defaults.json.user
+
+## Arquivos de teste e fotos temporárias geradas no terminal
+foto-teste.png
+teste-foto.png
+
+## Pastas de compilação do .NET (Binários e Objetos)
+/[Bb]in/
+/[Oo]bj/
+[Bb]in/
+[Oo]bj/
+
+## Extensões e caches de compilação do Roslyn/C#
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+## Ferramentas de Teste e Relatórios de Cobertura do .NET
+.lambda-test-tool/
+*.ntvs*
+*.njsproj
+*.pfx
+*.publishsettings
+
+## Docker residuais locais
+.docker/
+*.tar
+
+## Arquivos do VS Code (Configurações de Workspace locais)
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+
+## Arquivos do Sistema Operacional (Windows / macOS)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
